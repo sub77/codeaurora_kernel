@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -190,7 +190,6 @@ enum qpnp_adc_calib_type {
  * %CHAN_PATH_SCALING2: ratio of {1, 4}
  * %CHAN_PATH_SCALING3: ratio of {1, 6}
  * %CHAN_PATH_SCALING4: ratio of {1, 20}
- * %CHAN_PATH_SCALING5: ratio of {1, 8}
  * %CHAN_PATH_NONE: Do not use this pre-scaling ratio type.
  *
  * The pre-scaling is applied for signals to be within the voltage range
@@ -202,7 +201,6 @@ enum qpnp_adc_channel_scaling_param {
 	PATH_SCALING2,
 	PATH_SCALING3,
 	PATH_SCALING4,
-	PATH_SCALING5,
 	PATH_SCALING_NONE,
 };
 
@@ -574,10 +572,12 @@ enum qpnp_adc_meas_timer_3 {
 /**
  * enum qpnp_adc_meas_timer_select - Selects the timer for which
  *	the appropriate polling frequency is set.
- * %ADC_MEAS_TIMER_SELECT1 - Select this timer for measurement polling interval
- *				for 1 second.
- * %ADC_MEAS_TIMER_SELECT2 - Select this timer for 500ms measurement interval.
- * %ADC_MEAS_TIMER_SELECT3 - Select this timer for 5 second interval.
+ * %ADC_MEAS_TIMER_SELECT1 - Select this timer if the client is USB_ID.
+ * %ADC_MEAS_TIMER_SELECT2 - Select this timer if the client is batt_therm.
+ * %ADC_MEAS_TIMER_SELECT3 - The timer is added only for completion. It is
+ *	not used by kernel space clients and user space clients cannot set
+ *	the polling frequency. The driver will set a appropriate polling
+ *	frequency to measure the user space clients from qpnp_adc_meas_timer_3.
  */
 enum qpnp_adc_meas_timer_select {
 	ADC_MEAS_TIMER_SELECT1 = 0,
@@ -839,6 +839,7 @@ struct qpnp_vadc_chan_properties {
 	enum qpnp_adc_meas_timer_2		meas_interval2;
 	enum qpnp_adc_tm_channel_select		tm_channel_select;
 	enum qpnp_state_request			state_request;
+	enum qpnp_adc_calib_type		calib_type;
 	struct qpnp_vadc_linear_graph	adc_graph[2];
 };
 
@@ -882,6 +883,7 @@ struct qpnp_adc_amux {
 	enum qpnp_adc_scale_fn_type		adc_scale_fn;
 	enum qpnp_adc_fast_avg_ctl		fast_avg_setup;
 	enum qpnp_adc_hw_settle_time		hw_settle_time;
+	enum qpnp_adc_calib_type		calib_type;
 };
 
 /**
@@ -893,8 +895,7 @@ static const struct qpnp_vadc_scaling_ratio qpnp_vadc_amux_scaling_ratio[] = {
 	{1, 3},
 	{1, 4},
 	{1, 6},
-	{1, 20},
-	{1, 8}
+	{1, 20}
 };
 
 /**

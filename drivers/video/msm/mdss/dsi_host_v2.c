@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -49,6 +49,12 @@ struct dsi_host_v2_private {
 
 static struct dsi_host_v2_private *dsi_host_private;
 static int msm_dsi_clk_ctrl(struct mdss_panel_data *pdata, int enable);
+
+#if defined(CONFIG_FB_MSM_MDSS_DSI_DBG)
+extern unsigned char *dsi_ctrl_base;
+extern void dumpreg(void);
+extern void mdp3_dump_clk(void);
+#endif
 
 int msm_dsi_init(void)
 {
@@ -285,6 +291,11 @@ static int msm_dsi_wait4mdp_done(struct mdss_dsi_ctrl_pdata *ctrl)
 
 	if (rc == 0) {
 		pr_err("DSI wait 4 mdp done time out\n");
+#if defined(CONFIG_FB_MSM_MDSS_DSI_DBG)
+		dumpreg();
+		mdp3_dump_clk();
+		panic("DSI wait 4 mdp done time out");
+#endif
 		rc = -ETIME;
 	} else if (!IS_ERR_VALUE(rc)) {
 		rc = 0;
@@ -524,11 +535,8 @@ void msm_dsi_controller_cfg(int enable)
 	if (readl_poll_timeout((ctrl_base + DSI_STATUS),
 				status,
 				((status & 0x02) == 0),
-				DSI_POLL_SLEEP_US, DSI_POLL_TIMEOUT_US)) {
+				DSI_POLL_SLEEP_US, DSI_POLL_TIMEOUT_US))
 		pr_err("%s: DSI status=%x failed\n", __func__, status);
-		pr_err("%s: Doing sw reset\n", __func__);
-		msm_dsi_sw_reset();
-	}
 
 	/* Check for x_HS_FIFO_EMPTY */
 	if (readl_poll_timeout((ctrl_base + DSI_FIFO_STATUS),
@@ -589,6 +597,19 @@ int msm_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 	unsigned char *ctrl_base = dsi_host_private->dsi_base;
 	unsigned long flag;
 
+#if defined(CONFIG_DSI_HOST_DEBUG)
+	int i = 0;
+	char *bp;
+
+	bp = tp->data;
+
+	printk("%s: ", __func__);
+	for (i = 0; i < tp->len; i++)
+		printk("%02X ", *bp++);
+
+	printk("\n");
+#endif
+
 	len = ALIGN(tp->len, 4);
 	size = ALIGN(tp->len, SZ_4K);
 
@@ -618,6 +639,10 @@ int msm_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 	rc = wait_for_completion_timeout(&ctrl->dma_comp,
 				msecs_to_jiffies(DSI_DMA_CMD_TIMEOUT_MS));
 	if (rc == 0) {
+#if defined(CONFIG_FB_MSM_MDSS_DSI_DBG)
+		dumpreg();
+		mdp3_dump_clk();
+#endif
 		pr_err("DSI command transaction time out\n");
 		rc = -ETIME;
 	} else if (!IS_ERR_VALUE(rc)) {
@@ -962,16 +987,10 @@ int msm_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 
 	msm_dsi_clk_ctrl(&ctrl->panel_data, 1);
 
-	if (0 == (req->flags & CMD_REQ_LP_MODE))
-		dsi_set_tx_power_mode(0);
-
 	if (req->flags & CMD_REQ_RX)
 		msm_dsi_cmdlist_rx(ctrl, req);
 	else
 		msm_dsi_cmdlist_tx(ctrl, req);
-
-	if (0 == (req->flags & CMD_REQ_LP_MODE))
-		dsi_set_tx_power_mode(1);
 
 	msm_dsi_clk_ctrl(&ctrl->panel_data, 0);
 
@@ -1495,6 +1514,9 @@ static int __devinit msm_dsi_probe(struct platform_device *pdev)
 			rc = -ENOMEM;
 			goto error_io_resource;
 		}
+#if defined(CONFIG_FB_MSM_MDSS_DSI_DBG)
+		dsi_ctrl_base = dsi_host_private->dsi_base;
+#endif
 	}
 
 	mdss_dsi_mres = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
